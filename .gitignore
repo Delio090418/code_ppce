@@ -5,25 +5,32 @@
 /RESULTS
 /RESULTS_cosine_sv
 /__pycache__
-/client_fed.py
-/cosine
 /data
-/data_breast.py
-/data_cifar.py
-/data_mnist.py
-/data_partition.py
-/data_partition_local.py
-/games.py
-/healthcare-dataset-stroke-data.csv
-/local_breast.py
-/mean_effect.log
-/mean_std.log
-/metrics.log
-/ppce.log
-/ppce_global.log
-/results.log
-/results_global.log
-/results_local.log
-/shapley.log
-/test.py
-/values
+*.log
+*.csv
+*.png
+*.pdf
+*.jpg
+*.jpeg
+*.gif
+# /client_fed.py
+# /cosine
+# /data_breast.py
+# /data_cifar.py
+# /data_mnist.py
+# /data_partition.py
+# /data_partition_local.py
+# /games.py
+# /healthcare-dataset-stroke-data.csv
+# /local_breast.py
+# /mean_effect.log
+# /mean_std.log
+# /metrics.log
+# /ppce.log
+# /ppce_global.log
+# /results.log
+# /results_global.log
+# /results_local.log
+# /shapley.log
+# /test.py
+# /values
