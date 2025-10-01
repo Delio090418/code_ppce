@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
-
+from torchvision import models
 
 #I use this model for CIFAR10 with num_classes=10, for brain data set with num_classes=4
 class CNN(nn.Module):
@@ -112,4 +112,18 @@ class LogisticRegressionModel(nn.Module):
         for model_parametro, param in zip(self.parameters(), params):
             model_parametro.data = param
 
+
+class resnet(nn.Module):
+    def __init__(self, num_classes=8):
+        super(resnet, self).__init__()
+        self.model  = models.resnet50(pretrained=True)
+        self.in_features = self.model.fc.in_features
+        self.model.fc = nn.Linear(self.in_features, num_classes)
+
+    def forward(self, x):
+        return self.model(x)
+
+    def set_parameters(self, params):
+        for model_parametro, param in zip(self.parameters(), params):
+            model_parametro.data = param
 

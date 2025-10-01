@@ -13,6 +13,9 @@ from utils import plot_boxplot_with_stats
 import os
 import pathlib
 from modelos import CNN, CNN_brain, MLP, LogisticRegressionModel
+import argparse
+from local_breast import commun_test_set 
+import matplotlib.pyplot as plt
 
 
 
@@ -77,13 +80,12 @@ class games(federation):
         d_privacy= dict()
         d_privacy[()]=0
         for client in range(self.num_clients):
-            d_privacy[tuple([client])] = (self.evaluation_global(self.lista_clientes[client].test),self.lista_clientes[client].evaluation(self.lista_clientes[client].test))
-        for client in range(self.num_clients):
             remove=[j for j in range(self.num_clients) if j!=client]
+            d_privacy[tuple([client])] = (self.evaluation_global(self.lista_clientes[client].test),self.lista_clientes[client].evaluation(self.lista_clientes[client].test))
             part=[self.lista_clientes[i] for i in remove]
             params = self.weighted_aggre(part)
             self.set_parameters(params)
-            d_privacy[tuple(remove)] = self.evaluation_global(self.lista_clientes[client].test)
+            d_privacy[tuple(remove)] = (self.evaluation_global(self.lista_clientes[client].test))
         logger_f(f"at coalitional values: {d_privacy}",f"{path}/values/results_local.log")
         d = dict()
         d[()]=0
@@ -126,18 +128,18 @@ class games(federation):
                 if tpl == tuple(remove):
                     leave[i] = dict[tpl]
         for i in range(self.num_clients):
-            i1i[i] = include[i] - null
-            l1o[i] = grands[i] - leave[i]
+            i1i[i] = (include[i] - null)
+            l1o[i] = -(grands[i] - leave[i])
             for j in range(self.num_clients):
-                ieei[i] += leave[j] - null
-                leeo[i] += grands[j] - include[j]
-            ieei[i] -= leave[i] - null
-            leeo[i] -= grands[i] - include[i]
-        ieei= ieei / (self.num_clients - 1) ** 2
-        leeo= leeo / (self.num_clients - 1) ** 2
-        se = i1i + l1o
-        ee = ieei + leeo
-        ppce = se + ee
+                ieei[i] += (leave[j] - null)
+                leeo[i] += (grands[j] - include[j])
+            ieei[i] -= (leave[i] - null)
+            leeo[i] -= (grands[i] - include[i])
+        ieei= -ieei / (self.num_clients - 1) ** 2
+        leeo= -leeo / (self.num_clients - 1) ** 2
+        se = (i1i + l1o)/2
+        ee = (ieei + leeo)/2
+        ppce = (se + ee)/2
         logger_f(f"i1i: {i1i.tolist()}",f"{path}/values/ppce_local.log")
         logger_f(f"l10: {l1o.tolist()}",f"{path}/values/ppce_local.log")
         logger_f(f"ie2i: {ieei.tolist()}",f"{path}/values/ppce_local.log")
@@ -147,6 +149,55 @@ class games(federation):
         logger_f(f"PPce: {ppce.tolist()}",f"{path}/values/ppce_local.log")
         return [i1i.tolist(), l1o.tolist(), ieei.tolist(), leeo.tolist(),se.tolist(),ee.tolist(),ppce.tolist()]
     
+    def coalition_plot(self,d_local, d_global):
+        tpl_global=tuple(range(self.num_clients))
+        for i in range(self.num_clients):
+            ieei_local = np.zeros(self.num_clients)
+            ieei_global = np.zeros(self.num_clients)
+            leeo_local = np.zeros(self.num_clients)
+            leeo_global = np.zeros(self.num_clients)
+            for j in range(self.num_clients):
+                if j!=i:
+                    remove=[k for k in range(self.num_clients) if k!=j]
+                    ieei_local[j]= d_local[tuple(remove)]            
+                    ieei_global[j]= d_global[tuple(remove)]            
+                    leeo_global[j]= d_global[tpl_global]-d_global[tuple([j])]            
+                    leeo_local[j]= d_local[tuple([j])][0]-d_local[tuple([j])][1]            
+                else:
+                    ieei_local[j]= 0           
+                    ieei_global[j]= 0           
+                    leeo_global[j]= 0           
+                    leeo_local[j]= 0
+            x_labels = [f"Coa. {j}" for j in range(self.num_clients)]
+            x = np.arange(len(x_labels))  # the label locations
+            # Plot for ieei_local
+            plt.figure(figsize=(10, 6))
+            plt.bar(x, ieei_local, color='blue', width=0.2,alpha=0.7, label='ieei_local')
+            plt.bar(x+0.2, ieei_global, color='green', width=0.2 , alpha=0.7, label='ieei_global')
+            plt.xticks(x, x_labels, rotation=45)
+            plt.xlabel("Clients")
+            plt.ylabel("Values")
+            plt.title(f"IEEI Local for Client {i}")
+            plt.legend()
+            plt.grid(axis='y', linestyle='--', alpha=0.7)  # Add a light grid for readability
+            plt.tight_layout()
+            plt.savefig(f"./RESULTS_local/ieei_local_global_client_{i}.png")  # Save the plot as a PNG file
+            plt.close()
+
+            # Plot for ieei_global
+            # plt.figure(figsize=(10, 6))
+            # plt.xticks(x, x_labels, rotation=45)
+            # plt.xlabel("Clients")
+            # plt.ylabel("Values")
+            # plt.title(f"IEEI Global for Client {i}")
+            # plt.legend()
+            # plt.grid(axis='y', linestyle='--', alpha=0.7)  # Add a light grid for readability
+            # plt.tight_layout()
+            # plt.savefig(f"./RESULTS_local/ieei_global_client_{i}.png")  # Save the plot as a PNG file
+            # plt.close()
+            
+    
+        
 
     def valores_por_rondas(self,itera,path,epochs=5):   
             """
@@ -277,6 +328,8 @@ class games(federation):
 
     
 ##################################################
+
+#this function has been modify to only consider the cos similarity. the original statistic function is test.py
     
     def statistic(self,path,iter_one,iter_two=10,epochs=5):
         """
@@ -300,11 +353,10 @@ class games(federation):
         for i in range(iter_one):
             valores=self.valores_por_rondas(iter_two,path,epochs)
             #matrix
-            for_mean_glo=[valores[0]]+valores[2]
+            for_mean_glo=[valores[0]]+valores[2]+[valores[3]]
             matrix_scores_last_rounds_gl.append(np.array(for_mean_glo).T)
             for_mean_lo=[valores[0]]+valores[1]
             matrix_scores_last_rounds_lo.append(np.array(for_mean_lo).T)
-
             #global
             valor_wc=valores[2]+[valores[3]]
             metrlr=approx_quantities(valores[0],valor_wc,f"{path}/values/metrics_global.log")
@@ -321,25 +373,26 @@ class games(federation):
             kend_lr_local.append([metrlr_local[k][3] for k in range(len(valor_local))])
             tqdm.write(f"iteration_global={i}")
             #"global":
-        lse_dir_cos=np.array(rat_err_lr)[:, [-1]]-np.array(rat_err_lr)[:, :-1]
-        spear_dir_cos=np.array(spear_lr)[:, :-1]-np.array(spear_lr)[:, [-1]]
-        pear_dir_cos= np.array(pear_err_lr)[:, :-1]- np.array(pear_err_lr)[:, [-1]]
-        kend_dir_cos=np.array(kend_lr)[:, :-1]-np.array(kend_lr)[:, [-1]]
-        arrays_lr=[np.array(rat_err_lr)[:, :-1],np.array(spear_lr)[:, :-1],np.array(pear_err_lr)[:, :-1],np.array(kend_lr)[:, :-1],lse_dir_cos,spear_dir_cos,pear_dir_cos,kend_dir_cos]
-        metrica=metrlr[:-1]
+        #lse_dir_cos=np.array(rat_err_lr)[:, [-1]]-np.array(rat_err_lr)[:, :-1]
+        #spear_dir_cos=np.array(spear_lr)[:, :-1]-np.array(spear_lr)[:, [-1]]
+        #pear_dir_cos= np.array(pear_err_lr)[:, :-1]- np.array(pear_err_lr)[:, [-1]]
+        #kend_dir_cos=np.array(kend_lr)[:, :-1]-np.array(kend_lr)[:, [-1]]
+        arrays_lr=[np.array(rat_err_lr),np.array(spear_lr),np.array(pear_err_lr),np.array(kend_lr)]#,lse_dir_cos,spear_dir_cos,pear_dir_cos,kend_dir_cos]
+        metrica=metrlr
             #"local":
         arrays_lr_local=[np.array(rat_err_lr_local),np.array(spear_lr_local),np.array(pear_err_lr_local),np.array(kend_lr_local)]
         metrica_local=metrlr_local
         return [arrays_lr,arrays_lr_local],valores,[metrica,metrica_local],np.array(matrix_scores_last_rounds_gl),np.array(matrix_scores_last_rounds_lo)#,#,metrmean,effects_EE
     
 
-    def boxplot(self,valores,metricas,path,name,retraining=None):
+    def boxplot(self,valores,metricas,path,name,metrics_names,retraining=None):
         # if level == "global":
         #     metricas_global=["Normalize_lse","Spearman","Pearson","Kendall","Normalize_lse_CoSim","Spearman_CoSim","Pearson_CoSim","Kendall_CoSim"]
         # elif level== "local":
         #     metricas_local=["Normalize_lse","Spearman","Pearson","Kendall"]
         # valores=self.valores_por_rondas(ite)
         for i in range(len(valores)):
+            length=len(valores[i][0])
             metric=metricas[i]
             avg_i1i=[row[0] for row in valores[i]]
             avg_l1o=[row[1] for row in valores[i]]
@@ -348,47 +401,57 @@ class games(federation):
             avg_se=[row[4] for row in valores[i]]
             avg_ee=[row[5] for row in valores[i]]
             avg_ppce=[row[6] for row in valores[i]]
-            if retraining==None:
-                big_list=[avg_i1i,avg_l1o,avg_ieei,avg_leeo,avg_se,avg_ee,avg_ppce]
+            if length>7:
+                avg_fi1i=[row[7] for row in valores[i]]
+                avg_fl1o=[row[8] for row in valores[i]]
+                avg_cos=[row[9] for row in valores[i]]
+                if retraining==None:
+                    big_list=[avg_i1i,avg_l1o,avg_ieei,avg_leeo,avg_se,avg_ee,avg_ppce,avg_fi1i,avg_fl1o,avg_cos]
+                else:
+                    av_sv=[row[9] for row in valores[i]]
+                    big_list=[avg_i1i,avg_l1o,avg_ieei,avg_leeo,avg_se,avg_ee,avg_ppce,avg_fi1i,avg_fl1o,av_sv]
             else:
-                av_sv=[row[7] for row in valores[i]]
-                big_list=[avg_i1i,avg_l1o,avg_ieei,avg_leeo,avg_se,avg_ee,avg_ppce,av_sv]
+                if retraining==None:
+                    big_list=[avg_i1i,avg_l1o,avg_ieei,avg_leeo,avg_se,avg_ee,avg_ppce]
+                else:
+                    av_sv=[row[7] for row in valores[i]]
+                    big_list=[avg_i1i,avg_l1o,avg_ieei,avg_leeo,avg_se,avg_ee,avg_ppce,av_sv]
             means = [np.mean(lst).item() for lst in big_list]
             stds = [np.std(lst).item() for lst in big_list]
             logger_f(f"means for {metric}: {means}",f"{path}/values/mean_std.log")
             logger_f(f"stds for {metric}: {stds}",f"{path}/values/mean_std.log")
             if retraining==None:
-                plot_boxplot_with_stats(big_list,["I1I","L1O","IE2I","LE2O","SE","EE","PPCE"],path,f"{metric}: {name}",f"{metric}: {name}")
+                plot_boxplot_with_stats(big_list,metrics_names,path,f"{metric}: {name}",f"{metric}: {name}")
             else: 
-                plot_boxplot_with_stats(big_list,["I1I","L1O","IE2I","LE2O","SE","EE","PPCE","Data_SV"],path,f"{metric}: {name}",f"{metric}: {name}")
+                plot_boxplot_with_stats(big_list,metrics_names+["Data_SV"],path,f"{metric}: {name}",f"{metric}: {name}")
         logger_f(f"{name}, {self.dataset_name}, {self.num_clients}, {self.alpha}","mean_std")
     
     def simulation_global_iter(self,iteraci=10,iter_fed=10,epochs=1):
             if self.partition_type=="N-IID":
-                path1=f'./RESULTS/{self.dataset_name}/{self.num_clients}cli({self.alpha})_{iter_fed}fed'
+                path1=f'./RESULTS_local/{self.dataset_name}/{self.num_clients}cli({self.alpha})_{iter_fed}fed'
                 title=f"Case N-IID, alpha={self.alpha}, and iter={iter_fed}"
                 os.makedirs(path1, exist_ok=True)
             elif self.partition_type=='IID':
-                path1=f'./RESULTS/{self.dataset_name}/{self.num_clients}cli({self.partition_type})_{iter_fed}fed'
+                path1=f'./RESULTS_local/{self.dataset_name}/{self.num_clients}cli({self.partition_type})_{iter_fed}fed'
                 title=f"Case {self.partition_type}, and iter={iter_fed}"
                 os.makedirs(path1, exist_ok=True)
             name0=f"values_clients_global"
             name1=f"values_clients_local"
             name2=f"correlations_global_test_set"
             name3=f"correlations_local_test_set"
-            metricas_global=["Normalize_lse_global_test_set","Spearman_global_test_set","Pearson_global_test_set","Kendall_global_test_set","Difer_Nor_lse_CoSim","Dirf_Spearman_CoSim","Dirf_Pearson_CoSim","Dirf_Kendall_CoSim"]
+            metricas_global=["Normalize_lse_global_test_set","Spearman_global_test_set","Pearson_global_test_set","Kendall_global_test_set"]#"Difer_Nor_lse_CoSim","Dirf_Spearman_CoSim","Dirf_Pearson_CoSim","Dirf_Kendall_CoSim"]
             metricas_local=["Normalize_lse_local_test_set","Spearman_local_test_set","Pearson_local_test_set","Kendall_local_test_set"]
             transform_re=self.statistic(path1,iteraci,iter_fed,epochs=epochs)
             last_round_global=mean_columns_list(transform_re[3])#[transform_re[1][0]]+transform_re[1][2]
             last_round_local=mean_columns_list(transform_re[4])#[transform_re[1][0]]+transform_re[1][1]
-            combine_plot(last_round_global,["SV","I1I","L1O","IE2I","LE2O","SE","EE","PPCE"],path1,title,name0)
+            combine_plot(last_round_global,["SV","I1I","L1O","IE2I","LE2O","SE","EE","PPCE","f_I1I","f_L1O", "COS"],path1,title,name0)
             combine_plot(last_round_local,["SV","I1I","L1O","IE2I","LE2O","SE","EE","PPCE"],path1,title,name1)
             last_round_metr_global=transform_re[2][0]
             last_round_metr_local=transform_re[2][1]
-            plot_coeficits(last_round_metr_global,["I1I","L1O","IE2I","LE2O","SE","EE","PPCE"],path1,title,name2)
+            plot_coeficits(last_round_metr_global,["I1I","L1O","IE2I","LE2O","SE","EE","PPCE","f_I1I","f_L1O", "COS"],path1,title,name2)
             plot_coeficits(last_round_metr_local,["I1I","L1O","IE2I","LE2O","SE","EE","PPCE"],path1,title,name3)
-            self.boxplot(transform_re[0][0],metricas_global,path1,"last_round")
-            self.boxplot(transform_re[0][1],metricas_local,path1,"last_round")
+            self.boxplot(transform_re[0][0],metricas_global,path1,"last_round",["I1I","L1O","IE2I","LE2O","SE","EE","PPCE","f_I1I","f_L1O", "COS"])
+            self.boxplot(transform_re[0][1],metricas_local,path1,"last_round",["I1I","L1O","IE2I","LE2O","SE","EE","PPCE"])
             return transform_re[0], transform_re[3]
     
     def statistic_to_retr_game(self,path,iter_one,iter_two=10,epochs=5):
@@ -437,10 +500,10 @@ class games(federation):
             metricas_global=["Normalize_lse","Spearman","Pearson","Kendall"]
             transform_re=self.statistic_to_retr_game(path1,iteraci,iter_fed,epochs=epochs)
             last_round_global=transform_re[1]
-            combine_plot(last_round_global,["retr_SV","I1I","L1O","IE2I","LE2O","SE","EE","PPCE","Data_SV",],path1,title,name0)
+            combine_plot(last_round_global,["retr_SV","I1I","L1O","IE2I","LE2O","SE","EE","PPCE","f_I1I","f_L1O","Data_SV"],path1,title,name0)
             last_round_metr_global=transform_re[2]
-            plot_coeficits(last_round_metr_global,["I1I","L1O","IE2I","LE2O","SE","EE","PPCE","Data_SV"],path1,title,name2)
-            self.boxplot(transform_re[0],metricas_global,path1,"Comparation_to_retraining_SV",retraining="retrainig")
+            plot_coeficits(last_round_metr_global,["I1I","L1O","IE2I","LE2O","SE","EE","PPCE","f_I1I","f_L1O","Data_SV"],path1,title,name2)
+            self.boxplot(transform_re[0],metricas_global,path1,"Comparation_to_retraining_SV",["I1I","L1O","IE2I","LE2O","SE","EE","PPCE","f_I1I","f_L1O"],retraining="retraining")
             return transform_re[0]
 
 
@@ -452,18 +515,18 @@ def main(dict):
             play=juegos.simulation_global_iter(iter_global,iter_fed,epochs)
             valores=play[0]
             if par_type=="N-IID":
-                path1=f'./RESULTS/{data_name}/{num_cli}cli({alpha})_{iter_fed}fed/values/scores_over_glo_iter.log'
+                path1=f'./RESULTS_local/{data_name}/{num_cli}cli({alpha})_{iter_fed}fed/values/scores_over_glo_iter.log'
                 logger_f(f"{data_name}, num_cli={num_cli}, alpha={alpha}, iter_global={iter_global}, iter_fed={iter_fed}, {play[1]}",path1)
                 names=["Nor_lse","Spearman","Pearson","Kendall"]
                 for i in range(4):
-                    path=f'./RESULTS/{data_name}/{num_cli}cli({alpha})_{iter_fed}fed/values/{names[i]}.log'
+                    path=f'./RESULTS_local/{data_name}/{num_cli}cli({alpha})_{iter_fed}fed/values/{names[i]}.log'
                     logger_f(f"{data_name}, num_cli={num_cli}, alpha={alpha}, iter_global={iter_global}, iter_fed={iter_fed}, {valores[0][i]}",path)
             elif par_type=="IID":
-                path1=f'./RESULTS/{data_name}/{num_cli}cli({par_type})_{iter_fed}fed/values/scores_over_glo_iter.log'
+                path1=f'./RESULTS_local/{data_name}/{num_cli}cli({par_type})_{iter_fed}fed/values/scores_over_glo_iter.log'
                 logger_f(f"{data_name}, num_cli={num_cli}, {par_type}, iter_global={iter_global}, iter_fed={iter_fed}, {play[1]}",path1)
                 names=["Nor_lse","Spearman","Pearson","Kendall"]
                 for i in range(4):
-                    path=f'./RESULTS/{data_name}/{num_cli}cli({par_type})_{iter_fed}fed/values/{names[i]}.log'
+                    path=f'./RESULTS_local/{data_name}/{num_cli}cli({par_type})_{iter_fed}fed/values/{names[i]}.log'
                     logger_f(f"{data_name}, num_cli={num_cli}, {par_type}, iter_global={iter_global}, iter_fed={iter_fed}, {valores[0][i]}",path)
         elif retrining=="ON":
             juegos.simulations_retraining(iter_global,iter_fed,epochs)
@@ -473,23 +536,48 @@ def main(dict):
 
 
 if __name__ == "__main__":
+    # juegos=games("LOG_S", "STROKE",6,"N-IID",0.5)
+    # path="./RESULTS_local"
+    # dicts=juegos.local_coalicional_value_at_round(10,path,8)
+    # juegos.coalition_plot(dicts[0],dicts[1])
+    # values_local=juegos.local_pric_ce(dicts[0],path)
+    # # values_global=pri_ce(dicts[1],path)
+    # # combine_plot(values_global,["I1I","L1O","IE2I","LE2O","SE","EE","PPCE"],path,"coef_global","coef_global")
+    # combine_plot(values_local,["I1I","L1O","IE2I","LE2O","SE","EE","PPCE"],path,"coef_local","coef_local")
+
+
+
 
 
     # #format:[model, data_name, num_client, data_partition, alpha, global_iter, fed_iter, local_epochs, None]
     # #if you wanna see results comparing to the retraining game change None to "retraining"
-    dict_exper_breast={0:["CNN_brain","BRAIN",6,"N-IID",0.5,10,10,5,None]
-                       }
-    #                    #,
-    #                #1:["LOGISTIC","BREAST",3,"N-IID",0.5,10,10,1,retraining]}
-    # dict_exper_brain={
-    #                   0:["CNN_brain","BRAIN",3,"IID",0.5,10,10,3,None], 
-    #                   1:["CNN_brain","BRAIN",9,"N-IID",0.5,10,10,3,None],
-    #                   2:["CNN_brain","BRAIN",9,"IID",0.5,10,10,3,None], 
-    #                   3:["CNN_brain","BRAIN",3,"N-IID",0.5,10,10,3,None],
-    #                   4:["CNN_brain","BRAIN",6,"N-IID",0.5,10,5,3,None]
-    #                   }
+    parser = argparse.ArgumentParser(description="Parse command-line arguments example.")
+
+    # Add arguments
+    parser.add_argument("--num", type=int, default=0, help="Exp num")
+
+    # Parse the arguments
+    args = parser.parse_args()
+
+    #dict_exper={
+     #   0:["MLP","mnist",3,"IID",0.5,1,1,1,None], #This is for alpha = 0.1
+        #0:["CNN_brain","BRAIN",6,"IID",0.5,10,5,5,None], # This is for 5 fed. iterations
+        # 1:["CNN_brain","BRAIN",6,"N-IID",0.1,10,10,5,None], #This is for alpha = 0.1
+        #2:["CNN_brain","BRAIN",6,"IID",0.5,10,15,5,None], # This is for 15 fed. iterations
+        #3:["CNN_brain","BRAIN",6,"N-IID",1.0,10,10,5,None], #This is for alpha = 1.0
+        #4:["CNN_brain","BRAIN",3,"IID",0.5,10,10,5,None], #This is for 3 clients
+        #5:["CNN_brain","BRAIN",9,"IID",0.5,10,10,5,None], #This is for 9 clients
+    #}
+
+
+    dict_exper={
+                 0:["CNN","cifar10",9,"N-IID",0.5,3,5,5,None],
+                 #1:["CNN_brain","BRAIN",9,"N-IID",0.5,10,10,5,None],
+               }
     
-    main(dict_exper_breast) 
+    tmp = {args.num: dict_exper[args.num]}
+    main(tmp)
+    #main(dict_exper) 
 
 
     

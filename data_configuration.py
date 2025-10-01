@@ -17,30 +17,41 @@ np.random.seed(42)
 torch.manual_seed(42)
 
 datamnist='/Users/delio/Documents/Working_projects/Balazs/Experiments/MNIST/data_mnist'
-
-
 #transform and path for brain data set
-source_dir= '/Users/delio/Documents/Working_projects/Balazs/Experiments/Brain/archive'### path for brain data set
-source_dir = pathlib.Path(source_dir)
+datacifar10='/Users/delio/Documents/Working_projects/Balazs/code_ppce/data'
+#source_dir= '/Users/delio/Documents/Working_projects/Balazs/Experiments/Brain/archive'### path for brain data set
+#source_dir = pathlib.Path(source_dir)
 #I have cifar10 in the local folder, so no need the path here. but in case place it here
 
 ##transfor for brain data set
-transform_brain = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomRotation(10),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-])
+# transform_brain = transforms.Compose([
+#     transforms.Resize((224, 224)),
+#     transforms.RandomHorizontalFlip(),
+#     transforms.RandomRotation(10),
+#     transforms.ToTensor(),
+#     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+# ])
 
+    # if data_name=="BRAIN":
+    #     dataset = torchvision.datasets.ImageFolder(source_dir, transform=transform_brain)
+    # elif data_name=="mnist":
+def testing_training(data_name):
+    if data_name=="mnist":
+        dataset=datasets.MNIST(root=datamnist, train=True, download=False, transform=ToTensor())
+    elif data_name=="cifar10":
+        dataset = datasets.CIFAR10(root=datacifar10, train=True, download=False, transform=ToTensor())
+    else:
+        raise ValueError("Not support data set")
 
-dataset = torchvision.datasets.ImageFolder(source_dir, transform=transform_brain)
-
-train_size = int(0.8 * len(dataset))  # 80% for training
-test_size = len(dataset) - train_size  # 20% for validation
+    train_size = int(0.8 * len(dataset))  # 80% for training
+    test_size = len(dataset) - train_size  # 20% for validation
 
 # Split dataset into training and validation
-train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+    train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+    train=set_to_dataset(dataset, train_dataset)
+    test=set_to_dataset(dataset, test_dataset)
+    return train, test
+
 
 
 class set_to_dataset(Dataset):
@@ -74,7 +85,8 @@ class set_to_dataset(Dataset):
 #     # Create a TensorDataset from the data and targets
 #     return TensorDataset(data, targets)
 
-train=set_to_dataset(dataset, train_dataset)
+
+
 
 class RandomizedResponseDataset(Dataset):
     """
@@ -126,8 +138,9 @@ class RandomizedResponseDataset(Dataset):
 
 
 def partition_data(dataname, num_clients, alpha=0.5, partition_type='N-IID',seed=42):
+    train= testing_training(dataname)[0]
     np.random.seed(seed)
-    if dataname=="BRAIN":
+    if dataname=="BRAIN" or dataname=="mnist" or dataname=="cifar10":
         targets = []
         for _, target in train:
             targets.append(target)
@@ -163,7 +176,8 @@ def partition_data(dataname, num_clients, alpha=0.5, partition_type='N-IID',seed
     return client_indices
 
 
-def data_for_clients_brain(data_name, num_clients, alpha=0.5, partition_type='N-IID'):
+def data_clients(data_name, num_clients, alpha=0.5, partition_type='N-IID'):
+    train= testing_training(data_name)[0]
     client_partitions= partition_data(data_name, num_clients, alpha, partition_type=partition_type)
     client_data = {}
     
@@ -193,29 +207,19 @@ def data_for_clients_brain(data_name, num_clients, alpha=0.5, partition_type='N-
     return client_data
 
 
-def commun_test_set_brain():
-    test=set_to_dataset(dataset, test_dataset)
+def commun_test(data_name):
+    test= testing_training(data_name)[1]
     test_loader = DataLoader(test, batch_size=32, shuffle=False)
     return test_loader
 
 
 if __name__ == "__main__":
-    print(len(train))
-    data_name="BRAIN"
+
+    data_name="cifar10"
     partition="N-IID"
     alpha=.5#0.14
-    num_clients=6
-    set=data_for_clients_brain(data_name,num_clients,alpha,partition)
-    print(len(set[0]["train_loader"].dataset))
-    print(len(set[1]["train_loader"].dataset))
-    print(len(set[2]["train_loader"].dataset))
-    print(len(set[3]["train_loader"].dataset))
-    print(len(set[4]["train_loader"].dataset))
-    print(len(set[5]["train_loader"].dataset))
+    num_clients=3
+    set=data_clients(data_name,num_clients,alpha,partition)
     print(len(set[0]["test_loader"].dataset))
     print(len(set[1]["test_loader"].dataset))
     print(len(set[2]["test_loader"].dataset))
-    print(len(set[3]["test_loader"].dataset))
-    print(len(set[4]["test_loader"].dataset))
-    print(len(set[5]["test_loader"].dataset))
-    

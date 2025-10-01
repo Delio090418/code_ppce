@@ -119,6 +119,8 @@ def pri_ce(clients, groups, acc, path):
         '''
         i1i = np.zeros(clients)
         l1o = np.zeros(clients)
+        f_l1o= np.zeros(clients)
+        f_i1i= np.zeros(clients)
         ieei = np.zeros(clients)
         leeo = np.zeros(clients)
         include = np.zeros(clients)
@@ -138,15 +140,26 @@ def pri_ce(clients, groups, acc, path):
             i1i[i] = include[i] - null
             l1o[i] = grand - leave[i]
             for j in range(clients):
-                ieei[i] += leave[j] - null
-                leeo[i] += grand - include[j]
-            ieei[i] -= leave[i] - null
-            leeo[i] -= grand - include[i]
-        ieei= ieei / (clients - 1) ** 2
-        leeo= leeo / (clients - 1) ** 2
+                ieei[i] += (leave[j] - null)
+                leeo[i] += (grand - include[j])
+            ieei[i] -= (leave[i] - null)
+            leeo[i] -= (grand - include[i])
+        ieei= ieei/(clients - 1) ** 2
+        leeo= leeo/(clients - 1) ** 2
+        #beta_ieei=np.sum(ieei)
+        #beta_leeo=np.sum(leeo)
+        #ieei= ieei*(grand/beta_ieei)
+        #leeo= leeo*(grand/beta_leeo)
         se = (i1i + l1o)/2
         ee = (ieei + leeo)/2
         ppce = (se + ee)/2
+        beta_l1o=np.sum(l1o)
+        beta_i1i=np.sum(i1i)
+        for i in range(clients):
+            f_l1o[i] = (l1o[i]*grand)/ beta_l1o
+            f_i1i[i] = (i1i[i]*grand)/ beta_i1i
+        logger_f(f"f_i1i: {f_i1i.tolist()}",f"{path}/values/ppce_global.log")
+        logger_f(f"f_l1o: {f_l1o.tolist()}",f"{path}/values/ppce_global.log")
         logger_f(f"i1i: {i1i.tolist()}",f"{path}/values/ppce_global.log")
         logger_f(f"l10: {l1o.tolist()}",f"{path}/values/ppce_global.log")
         logger_f(f"ie2i: {ieei.tolist()}",f"{path}/values/ppce_global.log")
@@ -154,7 +167,58 @@ def pri_ce(clients, groups, acc, path):
         logger_f(f"se: {se.tolist()}",f"{path}/values/ppce_global.log")
         logger_f(f"ee: {ee.tolist()}",f"{path}/values/ppce_global.log")
         logger_f(f"PPce: {ppce.tolist()}",f"{path}/values/ppce_global.log")
-        return [i1i.tolist(), l1o.tolist(), ieei.tolist(), leeo.tolist(),se.tolist(),ee.tolist(),ppce.tolist()]
+        return [i1i.tolist(), l1o.tolist(), ieei.tolist(), leeo.tolist(),se.tolist(),ee.tolist(),ppce.tolist(),f_i1i.tolist(), f_l1o.tolist()]
+
+
+# def pri_ce(clients, groups, acc, path):
+#         '''
+#         compute the privacy-preserving contribution scores
+#             (input)  clients: client number
+#             (input)  groups:  coalitions with binary assignment matrix, e.g. for 2 players [[0,0],[1,0],[0,1],[1,1]]
+#             (input)  acc:     accuracies of the corresponding groups, e.g., for two players [a, b, c, d]
+#             (output) i1i:     include-one-in
+#             (output) l1o:     leave-one-out
+#             (output) ieei:    include-everybody-else-in
+#             (output) leeo:    leave-everybody-else-out
+#         '''
+#         i1i = np.zeros(clients)
+#         l1o = np.zeros(clients)
+#         ieei = np.zeros(clients)
+#         leeo = np.zeros(clients)
+#         include = np.zeros(clients)
+#         leave = np.zeros(clients)
+#         for i, subset in enumerate(groups):
+#             if np.sum(subset) == 0:
+#                 null = acc[i]
+#             if np.sum(subset) == clients:
+#                 grand = acc[i]
+#             if np.sum(subset) == 1:
+#                 tmp = [j for j, k in enumerate(subset) if k == 1]
+#                 include[tmp[0]] = acc[i]
+#             if np.sum(subset) == clients - 1:
+#                 tmp = [j for j, k in enumerate(subset) if k == 0]
+#                 leave[tmp[0]] = acc[i]
+#         for i in range(clients):
+#             i1i[i] = include[i] - null
+#             l1o[i] = grand - leave[i]
+#             for j in range(clients):
+#                 ieei[i] += (leave[j] - null)
+#                 leeo[i] += (grand - include[j])
+#             ieei[i] -= (leave[i] - null)
+#             leeo[i] -= (grand - include[i])
+#         ieei= ieei / (clients - 1) ** 2
+#         leeo= leeo / (clients - 1) ** 2
+#         se = (i1i + l1o)/2
+#         ee = (ieei + leeo)/2
+#         ppce = (se + ee)/2
+#         logger_f(f"i1i: {i1i.tolist()}",f"{path}/values/ppce_global.log")
+#         logger_f(f"l10: {l1o.tolist()}",f"{path}/values/ppce_global.log")
+#         logger_f(f"ie2i: {ieei.tolist()}",f"{path}/values/ppce_global.log")
+#         logger_f(f"le2o: {leeo.tolist()}",f"{path}/values/ppce_global.log")
+#         logger_f(f"se: {se.tolist()}",f"{path}/values/ppce_global.log")
+#         logger_f(f"ee: {ee.tolist()}",f"{path}/values/ppce_global.log")
+#         logger_f(f"PPce: {ppce.tolist()}",f"{path}/values/ppce_global.log")
+#         return [i1i.tolist(), l1o.tolist(), ieei.tolist(), leeo.tolist(),se.tolist(),ee.tolist(),ppce.tolist()]
         #return i1i, l1o, ieei, leeo, se, ee, ppce    
 
 
@@ -173,6 +237,7 @@ def effect(clients, groups, acc):
         '''
         efieei = np.zeros((clients,clients))
         efleeo = np.zeros((clients,clients))
+        efee = np.zeros((clients,clients))
         ieei = np.zeros(clients)
         leeo = np.zeros(clients)
         include = np.zeros(clients)
@@ -194,20 +259,24 @@ def effect(clients, groups, acc):
                 leeo[i] += grand - include[j]
             ieei[i] -= leave[i] - null
             leeo[i] -= grand - include[i]
-        ie2i= ieei / (clients - 1) ** 2
-        le2o= leeo / (clients - 1) ** 2
+        ieei= ieei / (clients - 1) ** 2
+        leeo= leeo / (clients - 1) ** 2
+        ee = (ieei + leeo)/2
         for i in range(clients):
             for j in range(clients):
                 if i==j:
                     efieei[i,j]=0
                     efleeo[i,j]=0
+                    efee[i,j]=0
                 else:
                     efieei[i,j]=(leave[i] - null)/ieei[j]
                     efleeo[i,j]=(grand - include[i])/leeo[j]
+                    efee[i,j]=((grand - include[i])+(leave[i] - null))/ee[j]
         logger_f(f"effect ieei: {efieei}","effects")
         logger_f(f"effect leeo: {efleeo}","effects")
-        return [efieei,efleeo]
-        #return i1i, l1o, ieei, leeo, se, ee, ppce 
+        logger_f(f"effect ee: {efee}","effects")
+        return [efieei,efleeo,efee]
+
 
 def affine_trans_list(lst):
     numbers=np.array(lst)
@@ -403,8 +472,23 @@ def mean_columns_list(array):
 
     return columns
 
+def mean_and_variance(numbers):
+    if not numbers:
+        raise ValueError("The list is empty")
 
-if __name__ == "__main__":
+    n = len(numbers)
+    mean = sum(numbers) / n
+    variance = sum((x - mean) ** 2 for x in numbers) / n  # Population variance
+
+    return mean, variance
+
+
+#if __name__ == "__main__":
+    # lista=[]
+    # mean, variance=mean_and_variance(lista)
+    # print(f"Mean: {mean}, Variance: {variance}")
+
+
     # values_global=[[0.9482758620689655, 0.7931034482758621, 0.646551724137931],
     #                [0.18103448275862066, -0.017241379310344862, -0.051724137931034475],
     #                [0.4439655172413792, 0.3943965517241379, 0.38577586206896547],
@@ -436,23 +520,35 @@ if __name__ == "__main__":
          
 
     #new_list=[[a - b for a, b in zip(lst1, lst2)] for lst1, lst2 in zip(values_global,values_local)]
-    new_list=[[0.26041667, 0.30729167,0.24479167],
-              [0.02083333333333337, 0.07291666666666663, 0.01041666666666663],
-              [0.7552083333333334, 0.796875, 0.734375],
-              [0.0234375, 0.03385416666666666, 0.018229166666666657],
-              [0.38541666666666674, 0.3984375, 0.3828125],
-              [0.38802083333333337, 0.4348958333333333, 0.3723958333333333],
-              [0.20442708333333337, 0.21614583333333331, 0.20052083333333331],
-              [0.29622395833333337, 0.3255208333333333, 0.2864583333333333]]
+    # new_list=[[0.26041667, 0.30729167,0.24479167],
+    #           [0.02083333333333337, 0.07291666666666663, 0.01041666666666663],
+    #           [0.7552083333333334, 0.796875, 0.734375],
+    #           [0.0234375, 0.03385416666666666, 0.018229166666666657],
+    #           [0.38541666666666674, 0.3984375, 0.3828125],
+    #           [0.38802083333333337, 0.4348958333333333, 0.3723958333333333],
+    #           [0.20442708333333337, 0.21614583333333331, 0.20052083333333331],
+    #           [0.29622395833333337, 0.3255208333333333, 0.2864583333333333],
+    #           [0.26241667, 0.30929167,0.24679167]]
+    # new_list=[[0.14875, 0.13498264, 0.137899306, 0.143385418, 0.120190972, 0.140833334],
+    #           [0.013541666666666674, 0.00625, -2.2204460492503132e-17, 0.009375, -0.009375000000000022, 0.002083333333333304],
+    #           [0.3770833333333333, 0.371875, 0.37135416666666665, 0.375, 0.3520833333333333, 0.38125],
+    #           [0.09114583333333333, 0.09093749999999999, 0.09091666666666667, 0.09106249999999999, 0.09014583333333333, 0.09131249999999999],
+    #           [0.9360123872756958, 0.9294776916503906, 0.925611674785614, 0.9207006692886353, 0.9288671016693115, 0.9214624762535095]]
     #names=["SV","L1O","I1I","LE2O","IE2I"]
-    names=["SV","L1O","I1I","LE2O","IE2I","SE","EE","PPCE"]
-    path='/Users/delio/Documents/Working projects/Balazs/table_latex'
-    #title="Score difference between global and local evaluation"
-    title="Score values on the stroke setup"
-    name="contr_scor_global_strokes"
-    combine_plot(new_list, names, path,title, name)
+    # #names=["SV","L1O","I1I","LE2O","IE2I","SE","EE","SEE","FP"]
+    # new_list=[[0.12005208666666667, 0.07277199333333334, 0.05245949, 0.06574074, 0.05442708666666667, 0.046006946666666666],
+    #           [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    #           [0.3098958333333333, 0.2664930555555556, 0.15625, 0.2065972222222222, 0.2586805555555556, 0.22829861111111113],
+    #           [0.0390625, 0.03756944444444444, 0.03309027777777777, 0.03520833333333333, 0.03607638888888889, 0.03583333333333333],
+    #           [0.9984095096588135, 0.9982531070709229, 0.9982820153236389, 0.998651385307312, 0.9979563355445862, 0.998652994632721]]
 
 
 
+    # names=["SV","L1O","FP","EE","COS"]
 
+    # path='/Users/delio/Documents/Working_projects/Balazs/table_latex'
+    # #title="Score difference between global and local evaluation"
+    # title="Score values on the non-IID ISIC2019 setup"
+    # name="contr_scor_global_isic2019"
+    # combine_plot(new_list, names, path,title, name)
 
